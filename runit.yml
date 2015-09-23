@@ -4,6 +4,7 @@
   vars:
     - go_services:
       - go-server
+      - go-agent
       - go-agent-1
       - go-agent-2
 
@@ -51,16 +52,16 @@
           exec chpst -u go /usr/share/go-server/server.sh
 
     - copy:
-        dest: "/etc/service/go-agent-{{item}}/run"
+        dest: "/etc/service/go-agent{{item}}/run"
         mode: 0755
         content: |
           #!/bin/sh
-          SERVICE_NAME=go-agent-{{item}}
+          SERVICE_NAME=go-agent{{item}}
           DEBIANCONFIG=/etc/default/$SERVICE_NAME
           test -f $DEBIANCONFIG && . $DEBIANCONFIG
           exec 2>&1
-          exec chpst -u go /usr/share/go-agent-{{item}}/agent.sh $SERVICE_NAME
-      with_items: [1, 2]
+          exec chpst -u go /usr/share/go-agent{{item}}/agent.sh $SERVICE_NAME
+      with_items: ["", "-1", "-2"]
 
     - runit:
         name: "{{item}}"
