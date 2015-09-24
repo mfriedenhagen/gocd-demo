@@ -7,6 +7,9 @@
       - go-agent
       - go-agent-1
       - go-agent-2
+    - go_services_to_start:
+      - go-server
+      - go-agent
 
   tasks:
     - apt:
@@ -18,7 +21,7 @@
         state: latest
 
     - stat:
-        path: /etc/service/go-server
+        path: /etc/sv/go-server
       register: go_server_service
 
     - command: "/etc/init.d/{{item}} stop"
@@ -31,7 +34,12 @@
       with_items: go_services
 
     - file:
-        path: "/etc/service/{{item}}"
+        path: "/etc/sv/{{item}}"
+        state: directory
+      with_items: go_services
+
+    - file:
+        path: "/etc/sv/{{item}}/log"
         state: directory
       with_items: go_services
 
@@ -42,7 +50,7 @@
       with_items: go_services
 
     - copy:
-        dest: /etc/service/go-server/run
+        dest: /etc/sv/go-server/run
         mode: 0755
         content: |
           #!/bin/sh
@@ -52,7 +60,7 @@
           exec chpst -u go /usr/share/go-server/server.sh
 
     - copy:
-        dest: "/etc/service/go-agent{{item}}/run"
+        dest: "/etc/sv/go-agent{{item}}/run"
         mode: 0755
         content: |
           #!/bin/sh
@@ -63,8 +71,23 @@
           exec chpst -u go /usr/share/go-agent{{item}}/agent.sh $SERVICE_NAME
       with_items: ["", "-1", "-2"]
 
+    - copy:
+        dest: "/etc/sv/{{item}}/log/run"
+        mode: 0755
+        content: |
+          #!/bin/sh
+          exec 2>&1
+          exec chpst -u go svlogd /var/log/{{item}}
+      with_items: go_services
+
+    - file:
+        dest: "/etc/service/{{item}}"
+        src: "/etc/sv/{{item}}"
+        state: link
+      with_items: go_services_to_start
+
     - runit:
         name: "{{item}}"
         state: started
-      with_items: go_services
+      with_items: go_services_to_start
 
