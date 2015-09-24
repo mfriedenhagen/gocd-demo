@@ -56,8 +56,22 @@
           #!/bin/sh
           DEBIANCONFIG=/etc/default/go-server
           test -f $DEBIANCONFIG && . $DEBIANCONFIG
+          cd /var/lib/go-server
           exec 2>&1
-          exec chpst -u go /usr/share/go-server/server.sh
+          exec chpst -u go /etc/alternatives/java \
+          -server \
+          -Xms512m \
+          -Xmx1024m \
+          -XX:PermSize=128m \
+          -XX:MaxPermSize=256m \
+          -Duser.language=en \
+          -Djruby.rack.request.size.threshold.bytes=30000000 \
+          -Duser.country=US \
+          -Dcruise.config.dir=/etc/go \
+          -Dcruise.config.file=/etc/go/cruise-config.xml \
+          -Dcruise.server.port=8153 \
+          -Dcruise.server.ssl.port=8154 \
+          -jar /usr/share/go-server/go.jar
 
     - copy:
         dest: "/etc/sv/go-agent{{item}}/run"
@@ -76,7 +90,6 @@
         mode: 0755
         content: |
           #!/bin/sh
-          exec 2>&1
           exec chpst -u go svlogd /var/log/{{item}}
       with_items: go_services
 
