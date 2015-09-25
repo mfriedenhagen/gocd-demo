@@ -15,6 +15,10 @@
     - go_server_port: 8153
     - go_server_port_ssl: 8154
 
+    - maven_version: 3.3.3
+    - maven_sha256: 9e031bc81acd92c1dd7cd00a9f8515d75b9cf2a550048dab109588eca4a4df45
+    - maven_base_url: http://repo1.maven.org/maven2/org/apache/maven/apache-maven
+
   tasks:
     - apt:
         update_cache: yes
@@ -109,3 +113,20 @@
         state: started
       with_items: go_services_to_start
 
+    - name: Fetch Maven
+      get_url:
+        dest: /usr/local/apache-maven-{{maven_version}}-bin.zip
+        url: "{{maven_base_url}}/{{maven_version}}/apache-maven-{{maven_version}}-bin.zip"
+        sha256sum: "{{maven_sha256}}"
+        timeout: 20
+
+    - name: Unpack Maven
+      unarchive:
+        copy: no
+        dest: /usr/local/
+        src: /usr/local/apache-maven-{{maven_version}}-bin.zip
+        creates: /usr/local/apache-maven-{{maven_version}}/bin/mvn
+
+    - command: update-alternatives --install /usr/bin/mvn mvn /usr/local/apache-maven-{{maven_version}}/bin/mvn 0
+      register: result
+      changed_when: result.stdout
