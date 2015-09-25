@@ -11,6 +11,10 @@
       - go-server
       - go-agent
 
+    - go_server_host: "127.0.0.1"
+    - go_server_port: 8153
+    - go_server_port_ssl: 8154
+
   tasks:
     - apt:
         update_cache: yes
@@ -69,8 +73,8 @@
           -Duser.country=US \
           -Dcruise.config.dir=/etc/go \
           -Dcruise.config.file=/etc/go/cruise-config.xml \
-          -Dcruise.server.port=8153 \
-          -Dcruise.server.ssl.port=8154 \
+          -Dcruise.server.port={{go_server_port}} \
+          -Dcruise.server.ssl.port={{go_server_port_ssl}} \
           -jar /usr/share/go-server/go.jar
 
     - copy:
@@ -78,11 +82,12 @@
         mode: 0755
         content: |
           #!/bin/sh
-          SERVICE_NAME=go-agent{{item}}
-          DEBIANCONFIG=/etc/default/$SERVICE_NAME
-          test -f $DEBIANCONFIG && . $DEBIANCONFIG
+          AGENT_MEM=128m
+          AGENT_MAX_MEM=256m
+          export AGENT_STARTUP_ARGS="-Dcruise.console.publish.interval=10 -Xms$AGENT_MEM -Xmx$AGENT_MAX_MEM $GO_AGENT_SYSTEM_PROPERTIES"
+          cd /var/lib/go-agent{{item}}
           exec 2>&1
-          exec chpst -u go /usr/share/go-agent{{item}}/agent.sh $SERVICE_NAME
+          exec chpst -u go /etc/alternatives/java -jar "/usr/share/go-agent/agent-bootstrapper.jar" {{go_server_host}} {{go_server_port}}
       with_items: ["", "-1", "-2"]
 
     - copy:
