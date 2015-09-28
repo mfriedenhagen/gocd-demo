@@ -79,6 +79,7 @@
           -Dcruise.config.file=/etc/go/cruise-config.xml \
           -Dcruise.server.port={{go_server_port}} \
           -Dcruise.server.ssl.port={{go_server_port_ssl}} \
+          -DpluginLocationMonitor.sleepTimeInSecs=3 \
           -jar /usr/share/go-server/go.jar
 
     - copy:
