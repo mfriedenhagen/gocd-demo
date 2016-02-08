@@ -15,8 +15,8 @@
     - go_server_port: 8153
     - go_server_port_ssl: 8154
 
-    - maven_version: 3.3.3
-    - maven_sha256: 9e031bc81acd92c1dd7cd00a9f8515d75b9cf2a550048dab109588eca4a4df45
+    - maven_version: 3.3.9
+    - maven_sha256: bb37146a67d067069754c775b9c9f03b52da953261981738de963057023cda3a
     - maven_base_url: http://repo1.maven.org/maven2/org/apache/maven/apache-maven
 
   tasks:
@@ -47,39 +47,47 @@
         name: runit
         state: latest
 
-    - stat:
+    - name: Check whether go-server is already installed.
+      stat:
         path: /etc/sv/go-server
       register: go_server_service
 
-    - command: "/etc/init.d/{{item}} stop"
-      with_items: go_services
+    - name: Stop go services
+      command: "/etc/init.d/{{item}} stop"
+      with_items: "{{go_services}}"
       when: "not go_server_service.stat.exists"
 
-    - service:
+    - name: Disable go services
+      service:
         name: "{{item}}"
         enabled: no
-      with_items: go_services
+      with_items: "{{go_services}}"
 
-    - file:
+    - name: Create runit directories for go services
+      file:
         path: "/etc/sv/{{item}}"
         state: directory
-      with_items: go_services
+      with_items: "{{go_services}}"
 
-    - file:
+    - name: Create log directories for go services
+      file:
         path: "/etc/sv/{{item}}/log"
         state: directory
-      with_items: go_services
+        group: go
+      with_items: "{{go_services}}"
 
-    - lineinfile:
+    - name: Disable daemonize of go services
+      lineinfile:
         dest: "/etc/default/{{item}}"
         regexp: "^DAEMON="
         line: DAEMON=N
-      with_items: go_services
+      with_items: "{{go_services}}"
 
-    - copy:
+    - name: Create runit service for go-server
+      copy:
         dest: /etc/sv/go-server/run
         mode: 0755
-        content: |
+        content: |-
           #!/bin/sh
           DEBIANCONFIG=/etc/default/go-server
           test -f $DEBIANCONFIG && . $DEBIANCONFIG
@@ -101,10 +109,11 @@
           -DpluginLocationMonitor.sleepTimeInSecs=3 \
           -jar /usr/share/go-server/go.jar
 
-    - copy:
+    - name: Create runit service for go-agents
+      copy:
         dest: "/etc/sv/go-agent{{item}}/run"
         mode: 0755
-        content: |
+        content: |-
           #!/bin/sh
           AGENT_MEM=128m
           AGENT_MAX_MEM=256m
@@ -114,31 +123,34 @@
           exec chpst -u go /etc/alternatives/java -jar "/usr/share/go-agent/agent-bootstrapper.jar" {{go_server_host}} {{go_server_port}}
       with_items: ["", "-1", "-2"]
 
-    - copy:
+    - name: Create runit log service
+      copy:
         dest: "/etc/sv/{{item}}/log/run"
         mode: 0755
-        content: |
+        content: |-
           #!/bin/sh
           exec chpst -u go svlogd /var/log/{{item}}
-      with_items: go_services
+      with_items: "{{go_services}}"
 
-    - file:
+    - name: "Create symlinks for automatic start of go-services"
+      file:
         dest: "/etc/service/{{item}}"
         src: "/etc/sv/{{item}}"
         state: link
-      with_items: go_services_to_start
+      with_items: "{{go_services_to_start}}"
 
-    - runit:
+    - name: "Start go services"
+      runit:
         name: "{{item}}"
         state: started
-      with_items: go_services_to_start
+      with_items: "{{go_services_to_start}}"
 
-    - name: Fetch Maven
+    - name: Fetch Maven, wait for 60 seconds
       get_url:
         dest: /usr/local/apache-maven-{{maven_version}}-bin.zip
         url: "{{maven_base_url}}/{{maven_version}}/apache-maven-{{maven_version}}-bin.zip"
         sha256sum: "{{maven_sha256}}"
-        timeout: 20
+        timeout: 60
 
     - name: Unpack Maven
       unarchive:
@@ -147,6 +159,7 @@
         src: /usr/local/apache-maven-{{maven_version}}-bin.zip
         creates: /usr/local/apache-maven-{{maven_version}}/bin/mvn
 
-    - command: update-alternatives --install /usr/bin/mvn mvn /usr/local/apache-maven-{{maven_version}}/bin/mvn 0
+    - name: Create symlink for Maven
+      command: update-alternatives --install /usr/bin/mvn mvn /usr/local/apache-maven-{{maven_version}}/bin/mvn 0
       register: result
       changed_when: result.stdout
